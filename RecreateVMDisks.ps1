@@ -1,7 +1,7 @@
 param(
   [Parameter(Mandatory = $true)][string]$subscriptionID, #ex: 00000000-0000-0000-0000-000000000000
-  [Parameter(Mandatory = $true)][string]$resourceGroupName, #ex: RG-TEST-VD-1-PRD
-  [Parameter(Mandatory = $true)][string]$vmName, #ex: vm-test-1vm-test-vd-1-prd
+  [Parameter(Mandatory = $true)][string]$resourceGroupName, #ex: RG-APP-DEV-01
+  [Parameter(Mandatory = $true)][string]$vmName, #ex: vm-app-test-01
   [string]$location = "sameAsOld",
   [string]$storageType = "sameAsOld", # for the new disks
   [Parameter(Mandatory = $true)][int]$zone = $null, # $null for no zone, otherwise: 1, 2, 3
