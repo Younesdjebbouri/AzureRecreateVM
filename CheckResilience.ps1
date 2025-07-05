@@ -14,6 +14,10 @@ $ErrorActionPreference = "Stop"
 
 Set-AzContext -Subscription $sid | Out-Null
 
+# VM names should follow the pattern <prefix>-<role>-<environment>-<number>.
+# Example: vm-front-prd-001. The role segment is used to group machines for
+# resilience checks. Hyphens are allowed in Azure VM names.
+
 $rg = Get-AzResourceGroup -ResourceGroupName $rgName
 $rgLower = $rg.ResourceGroupName.ToLower()
 $rgParts = $rgLower.Split("-")
@@ -376,20 +380,24 @@ function CheckASRVMs($RPIs, $vms)
 }
 
 # --------------------------------------------------
+function Get-VMRole($vmName)
+{
+  $parts = $vmName.ToLower().Split('-')
+  if ($parts.Count -ge 2)
+  {
+    return $parts[1]
+  }
+  return $null
+}
+
 WriteLog "Environment: $environment" INFO
 WriteLog "Environment type: $envType" INFO
 WriteLog "Project: $project" INFO
 
 CheckLocation $rg.Location "resource group $rgName"
 # --------------------------------------------------
-$vms_gc = @()
-$vms_bd = @() # database
-$vms_co = @() # connect
-$vms_ht = @() # Web SelfService
-$vms_mu = @() # Services Web SelfService
-$vms_muAll = @()
-$vms_pt = @() # planificateur
-$vms_vd = @() # session
+$vms_database = @()
+$vms_frontend = @()
 
 WriteLog "Fetching VMs infos..."
 $vms = Get-AzVm -ResourceGroupName $rgName
@@ -398,66 +406,22 @@ $nics = Get-AzNetworkInterface -ResourceGroupName $rgName
 WriteLog "Grouping machines"
 foreach($vm in $vms)
 {
-  if ($vm.Name.StartsWith("wzgc")) {$vms_gc += $vm}
-  if ($vm.Name.StartsWith("wzbd")) {$vms_bd += $vm}
-  if ($vm.Name.StartsWith("wzht")) {$vms_ht += $vm}
-  if ($vm.Name.StartsWith("wzvd")) {$vms_vd += $vm}
-  if ($vm.Name.StartsWith("wzmu")) {$vms_muAll += $vm}
-}
-
-WriteLog "Determining mu machines subgroups"
-$mu_groups = $vms_muAll | Group-Object -Property {$_.HardwareProfile.VmSize}
-if ($mu_groups.Name.Count -eq 3)
-{
-  $vms_mu = $mu_groups[0].Group
-  $vms_co = $mu_groups[1].Group
-  $vms_pt = $mu_groups[2].Group
-}
-else
-{
-  WriteLog "Unable to determine MU subgroups" WARN
-}
-
-# Fixes for some weird vms/envs
-if ($rgLower -eq "rg-e2-np-app-net-dev")
-{
-  $vms_pt = $vms_pt | Where-Object Name -ne "wzmunetd05"
-}
-elseif ($rgLower -eq "rg-e2-np-app-net-for")
-{
-  $vms_bd += $vms | Where-Object Name -eq "wzdanetf01"
-}
-elseif ($rgLower -eq "rg-e2-np-app-net-qua")
-{
-  $vms_gc += $vms | Where-Object Name -eq "wzmunetq02"
-  $vms_ht += $vms | Where-Object Name -eq "wzexnetq01"
-  $vms_mu += $vms | Where-Object Name -eq "wzmunetq03"
-  $vms_co += $vms | Where-Object Name -eq "wzmunetq04"
-  $vms_pt += $vms | Where-Object Name -eq "wzmunetq05"
-  $vms_pt += $vms | Where-Object Name -eq "wzmunetq06"
-  $vms_bd += $vms | Where-Object Name -eq "wzdanetq01"
-}
-elseif ($rgLower -eq "rg-e2-np-app-net-int")
-{
-  # wzmuneti03 currently in Standard_F8s_v2 rather than Standard_D4s_v3
-  $vms_mu = $vms | Where-Object {$_.Name -eq "wzmuneti01" -or $_.Name -eq "wzmuneti02"}
-  $vms_co = $vms | Where-Object {$_.Name -eq "wzmuneti03" -or $_.Name -eq "wzmuneti04"}
-  $vms_pt = $vms | Where-Object {$_.Name -eq "wzmuneti05" -or $_.Name -eq "wzmuneti06"}
+  $role = Get-VMRole $vm.Name
+  switch ($role)
+  {
+    "db"    { $vms_database += $vm }
+    "front" { $vms_frontend += $vm }
+  }
 }
 # --------------------------------------------------
-
-WriteLog "central: $($vms_gc.Name -join ' ')" INFO
-WriteLog "database: $($vms_bd.Name -join ' ')" INFO
-WriteLog "connect: $($vms_co.Name -join ' ')" INFO
-WriteLog "planificateur: $($vms_pt.Name -join ' ')" INFO
-WriteLog "session: $($vms_vd.Name -join ' ')" INFO
-WriteLog "web selfService: $($vms_ht.Name -join ' ')" INFO
-WriteLog "services web selfService: $($vms_mu.Name -join ' ')" INFO
+WriteLog "database: $($vms_database.Name -join ' ')" INFO
+WriteLog "frontend: $($vms_frontend.Name -join ' ')" INFO
+# --------------------------------------------------
 
 # --------------------------------------------------
 
 WriteLog "Checking Availability Zone & HA"
-$shouldBeInPrimaryZone = $vms_co + $vms_pt + $vms_vd + $vms_gc
+$shouldBeInPrimaryZone = $vms_frontend + $vms_database
 foreach ($vm in $shouldBeInPrimaryZone)
 {
   if ($vm.Zones.Count -eq 1 -and $vm.Zones[0] -eq $expected_primaryZone)
@@ -469,26 +433,17 @@ foreach ($vm in $shouldBeInPrimaryZone)
     WriteLog "VM $($vm.Name) is in zone $($vm.Zones), but expected to be in zone $expected_primaryZone" ERROR
   }
 }
-ShouldHave2InstancesAtLeast $vms_bd "databases"
-ShouldHave2InstancesAtLeast $vms_ht "Web SelfService"
-ShouldHave2InstancesAtLeast $vms_mu "Services Web SelfService"
-ShouldHave2InstancesAtLeast $vms_co "connect"
-ShouldHave2InstancesAtLeast $vms_pt "planificateur"
-ShouldHave2InstancesAtLeast $vms_vd "session"
-ShouldBeHalfInPrimaryZoneHalfInSecondaryZone $vms_bd "databases"
-ShouldBeHalfInPrimaryZoneHalfInSecondaryZone $vms_ht "Web SelfService"
-ShouldBeHalfInPrimaryZoneHalfInSecondaryZone $vms_mu "Services Web SelfService"
+ShouldHave2InstancesAtLeast $vms_database "databases"
+ShouldHave2InstancesAtLeast $vms_frontend "frontend"
+ShouldBeHalfInPrimaryZoneHalfInSecondaryZone $vms_database "databases"
+ShouldBeHalfInPrimaryZoneHalfInSecondaryZone $vms_frontend "frontend"
 
 # --------------------------------------------------
 
 WriteLog "Checking VMs size..."
 
-ShouldBeSameSize $vms_bd "databases"
-ShouldBeSameSize $vms_ht "Web SelfService"
-ShouldBeSameSize $vms_mu "Services Web SelfService"
-ShouldBeSameSize $vms_co "connect"
-ShouldBeSameSize $vms_pt "planificateur"
-ShouldBeSameSize $vms_vd "session"
+ShouldBeSameSize $vms_database "databases"
+ShouldBeSameSize $vms_frontend "frontend"
 
 # --------------------------------------------------
 
@@ -515,38 +470,20 @@ foreach($vm in $vms)
 # --------------------------------------------------
 
 WriteLog "Check Scale Set for max spreading in same zone"
-foreach ($group in @($vms_co, $vms_pt, $vms_vd))
+foreach ($vm in $vms_frontend)
 {
-  foreach ($vm in $group)
+  if ($null -eq $vm.VirtualMachineScaleSet.Id)
   {
-    if ($null -eq $vm.VirtualMachineScaleSet.Id)
-    {
-      $level = "ERROR"
-      if ($envType -eq "np" -and $group.Count -eq 1) {$level = "WARN"}
-      WriteLog "VM $($vm.Name) should be in a scale set" $level
-    }
-    else
-    {
-      WriteLog "VM $($vm.Name) is in a scale set" SUCCESS
-    }
-  }
-}
-CheckVMInSameScaleSet $vms_co "connect"
-CheckVMInSameScaleSet $vms_pt "planificateur"
-CheckVMInSameScaleSet $vms_vd "session"
-
-# Check planificateur 2nd NIC
-foreach ($vm in $vms_pt)
-{
-  if ($vm.NetworkProfile.NetworkInterfaces.Count -eq 2)
-  {
-    WriteLog "VM planificateur $($vm.Name) has 2 NICs for load balancing" SUCCESS
+    $level = "ERROR"
+    if ($envType -eq "np" -and $vms_frontend.Count -eq 1) { $level = "WARN" }
+    WriteLog "VM $($vm.Name) should be in a scale set" $level
   }
   else
   {
-    WriteLog "VM planificateur $($vm.Name) should have 2 NICs for load balancing (cf GIRO procedure)" ERROR
+    WriteLog "VM $($vm.Name) is in a scale set" SUCCESS
   }
 }
+CheckVMInSameScaleSet $vms_frontend "frontend"
 
 # --------------------------------------------------
 
@@ -669,7 +606,7 @@ if ($useASR)
           WriteLog "Listing ASR Protected Items"
           $RPIs = Get-AzRecoveryServicesAsrReplicationProtectedItem -ProtectionContainer $ProtContainer
 
-          $shouldBeInASR = $vms_co + $vms_pt + $vms_vd + $vms_gc
+          $shouldBeInASR = $vms_frontend + $vms_database
           CheckASRVMs $RPIs $shouldBeInASR
         }
       }
