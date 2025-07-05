@@ -1,8 +1,8 @@
 param(
   [Parameter(Mandatory = $true)][string]$sid, #ex: 00000000-0000-0000-0000-000000000000
-  [Parameter(Mandatory = $true)][string]$rg, #ex: RG-WVD-CPG-SP-01
-  [Parameter(Mandatory = $true)][string]$vmName, #ex: VM-WVD-SP-01
-  [Parameter(Mandatory = $true)][string]$vmssName, # Scale Set name, ex: VMSS-WVD-SP-01
+  [Parameter(Mandatory = $true)][string]$rg, #ex: RG-APP-DEV-01
+  [Parameter(Mandatory = $true)][string]$vmName, #ex: vm-app-test-01
+  [Parameter(Mandatory = $true)][string]$vmssName, # Scale Set name, ex: vmss1
   [string]$location = "francecentral",
   [string]$zone = 1 # Destination zone
 )

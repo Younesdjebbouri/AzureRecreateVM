@@ -1,5 +1,5 @@
 param(
-  [Parameter(Mandatory = $true)][string]$sid, #ex: 57197bef-475c-0000-0000-000D
+  [Parameter(Mandatory = $true)][string]$sid, #ex: 00000000-0000-0000-0000-000000000000
   [Parameter(Mandatory = $true)][string]$rgName,
   $expected_location = "francecentral",
   $expected_primaryZone = 1,

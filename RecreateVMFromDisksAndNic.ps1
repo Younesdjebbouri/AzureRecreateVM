@@ -1,14 +1,14 @@
 param(
   [Parameter(Mandatory = $true)][string]$subscriptionID, #ex: 00000000-0000-0000-0000-000000000000
-  [Parameter(Mandatory = $true)][string]$resourceGroupName, #ex: RG-APP-VD-DEV-001
-  [Parameter(Mandatory = $true)][string]$vmName, #ex: vm-test-az1
-  [Parameter(Mandatory = $true)][string]$nicName, #ex: nic1-vm-test-az1
+  [Parameter(Mandatory = $true)][string]$resourceGroupName, #ex: RG-APP-DEV-01
+  [Parameter(Mandatory = $true)][string]$vmName, #ex: vm-app-test-01
+  [Parameter(Mandatory = $true)][string]$nicName, #ex: nic1-vm-app-test-01
   [Parameter(Mandatory = $true)][string]$location, #ex: francecentral
   [Parameter(Mandatory = $true)][string]$size, #ex: Standard_F16s_v2
-  [Parameter(Mandatory = $true)][string]$osDiskName, #ex: osdisk-vm-test-az1
-  [string[]]$dataDisksName, #ex: datadisk-0-vm-test-az1,datadisk-1-vm-test-az1
-  [Parameter(Mandatory = $true)][string]$avName, # Availability Set name, ex: as-app-vm-test-az1
-  [Parameter(Mandatory = $true)][string]$ppgName, # Proximity Placement Group name, ex: ppg-app-vm-test-az1
+  [Parameter(Mandatory = $true)][string]$osDiskName, #ex: osdisk-vm-app-test-01-az1
+  [string[]]$dataDisksName, #ex: datadisk-0-vm-app-test-01-az1,datadisk-1-vm-app-test-01-az1
+  [Parameter(Mandatory = $true)][string]$avName, # Availability Set name, ex: as-app-vm-app-test-01
+  [Parameter(Mandatory = $true)][string]$ppgName, # Proximity Placement Group name, ex: ppg-app-vm-app-test-01
   [string]$ppgZone, # Proximity Placement Group zone, ex: 1
   [string[]]$intentVMSizeList, # Possible sizes of virtual machines that can be created in the proximity placement group
   [hashtable]$tags = @{},

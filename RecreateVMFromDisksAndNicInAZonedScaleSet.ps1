@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory = $true)][string]$subscriptionID , #ex: 00000000-0000-0000-0000-000000000000
-  [Parameter(Mandatory = $true)][string]$resourceGroupName , #ex: RG-APP-TEST-01
+  [Parameter(Mandatory = $true)][string]$resourceGroupName , #ex: RG-APP-DEV-01
   [Parameter(Mandatory = $true)][string]$vmName, #ex: vm-app-test-01
   [Parameter(Mandatory = $true)][string]$nicName , #ex: nic1-vm-app-test-01
   [Parameter(Mandatory = $true)][string]$nicResourceGroupName ,
