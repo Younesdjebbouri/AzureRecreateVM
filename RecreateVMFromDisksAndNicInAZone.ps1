@@ -1,15 +1,14 @@
 param(
-  [Parameter(Mandatory = $true)][string]$subscriptionID , #ex: 00000000-0000-0000-0000-000000000000
-  [Parameter(Mandatory = $true)][string]$resourceGroupName , #ex: RG-APP-TEST-01
-  [Parameter(Mandatory = $true)][string]$vmName, #ex: vm-app-test-01
-  [Parameter(Mandatory = $true)][string]$nicName , #ex: nic1-vm-app-test-01
+  [Parameter(Mandatory = $true)][string]$subscriptionID, #ex: 00000000-0000-0000-0000-000000000000
+  [Parameter(Mandatory = $true)][string]$resourceGroupName, #ex: RG-APP-DEV-01
   [Parameter(Mandatory = $true)][string]$nicResourceGroupName ,
-  [Parameter(Mandatory = $true)][string]$location , #ex: francecentral
-  [Parameter(Mandatory = $true)][string]$size , #ex: Standard_F16s_v2
-  [Parameter(Mandatory = $true)][string]$osDiskName , #ex: osdisk-vm-app-test-01-az1
-  [string[]]$dataDisksName , #ex: datadisk-0-vm-app-test-01-az1,datadisk-1-vm-app-test-01-az1
-  [Parameter(Mandatory = $true)][string]$zone , # Availability zone, ex: 1
-  [Parameter(Mandatory = $true)][string]$vmssName, # Scale Set name, ex: vmss1
+  [Parameter(Mandatory = $true)][string]$vmName, #ex: vm-app-test-01
+  [Parameter(Mandatory = $true)][string]$nicName, #ex: nic1-vm-app-test-01
+  [Parameter(Mandatory = $true)][string]$location, #ex: francecentral
+  [Parameter(Mandatory = $true)][string]$size, #ex: Standard_F16s_v2
+  [Parameter(Mandatory = $true)][string]$osDiskName, #ex: osdisk-vm-app-test-01-az1
+  [string[]]$dataDisksName, #ex: datadisk-0-vm-app-test-01-az1,datadisk-1-vm-app-test-01-az1
+  [Parameter(Mandatory = $true)][string]$zone, # Availability zone, ex: 1
   [hashtable]$tags = @{},
   [bool]$windows = $true,
   [bool]$onPremiseLicense = $true
@@ -27,25 +26,13 @@ if ($vm)
   Exit 1
 }
 
-$vmss = Get-AzVmss -ResourceGroupName $resourceGroupName -Name $vmssName -ErrorAction Stop
-if ($vmss.Zones[0] -ne $zone)
-{
-  Write-Error "Scale Set is not in the same zone as specified for the vm"
-  Exit 2
-}
-if ($vmss.Location.ToLower() -ne $location.ToLower())
-{
-  Write-Error "Scale Set is not in the same location as specified for the vm"
-  Exit 2
-}
-
 function GetDisk($resourceGroupName, $diskName)
 {
   $disk = Get-AzDisk -ResourceGroupName $resourceGroupName -DiskName $diskName
   if ($null -eq $disk)
   {
     Write-Error "Disk $name doesn't exists"
-    Exit 3
+    Exit 2
   }
   else
   {
@@ -54,11 +41,10 @@ function GetDisk($resourceGroupName, $diskName)
   if ($null -ne $disk.ManagedBy)
   {
     Write-Error "Disk $name is already attached to $($disk.ManagedBy.Split("/")[-1])"
-    Exit 4
+    Exit 3
   }
   return $disk
 }
-
 
 
 Write-Host "Create the virtual machine configuration"
@@ -68,7 +54,6 @@ $vm = New-AzVMConfig `
   -VMName $vmName `
   -VMSize $size `
   -Zone $zone `
-  -VmssId $vmss.Id `
   -Tags $tags `
   @extraArgs
 
@@ -121,4 +106,4 @@ $vm = Set-AzVMSecurityProfile -VM $vm -SecurityType "Standard"  # Prevents Trust
 
 Write-Host "Create the virtual machine $vmName"
 New-AzVM -ResourceGroupName $resourceGroupName -Location $location -VM $vm -DisableBginfoExtension
-Write-Host "Virtual machine $vmName created in scale set $vmssName"
+Write-Host "Virtual machine $vmName created"

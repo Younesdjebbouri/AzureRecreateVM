@@ -1,9 +1,9 @@
 param(
-  [Parameter(Mandatory = $true)][string]$sid, #ex: 50000000-0000-0000-0000-000000000000
-  [Parameter(Mandatory = $true)][string]$rg, #ex: RG-TEST-VD-1-PRD
+  [Parameter(Mandatory = $true)][string]$sid, #ex: 00000000-0000-0000-0000-000000000000
+  [Parameter(Mandatory = $true)][string]$rg, #ex: RG-APP-DEV-01
   [Parameter(Mandatory = $true)][string]$nicResourceGroupName ,
-  [Parameter(Mandatory = $true)][string]$vmName, #ex: vm-test-vd-1-prd
-  [Parameter(Mandatory = $true)][string]$vmssName, # Scale Set name, ex: vmss-vd-1-net-prd
+  [Parameter(Mandatory = $true)][string]$vmName, #ex: vm-app-test-01
+  [Parameter(Mandatory = $false)]
   [string]$location = "francecentral",
   [string]$zone = 1 # Destination zone
 )
@@ -13,9 +13,6 @@ $ErrorActionPreference = "Stop"
 Set-AzContext -Subscription $sid | Out-Null
 
 $vm = Get-AzVm -ResourceGroupName $rg -Name $vmName
-
-# Check vmss existence immediately to avoid error in middle of script after vm is removed
-Get-AzVmss -ResourceGroupName $rg -Name $vmssName -ErrorAction Stop
 
 Write-Host "Arrêt de la VM $vmName"
 Stop-AzVM -ResourceGroupName $rg -Name $vmName
@@ -35,8 +32,8 @@ Write-Host "La script va désormais supprimer la VM, tout en gardant les disques
 Remove-AzVM -ResourceGroupName $rg -Name $vmName  # Asks for confirmation
 Write-Host "VM $vmName supprimée"
 
-Write-Host "Recréation de la VM dans la zone $zone et le scale set $vmssName"
-.\RecreateVMFromDisksAndNicInAZonedScaleSet.ps1 `
+Write-Host "Recréation de la VM dans la zone $zone"
+.\RecreateVMFromDisksAndNicInAZone.ps1 `
   -subscriptionID $sid `
   -resourceGroupName $rg `
   -nicResourceGroupName $nicResourceGroupName `
@@ -46,6 +43,4 @@ Write-Host "Recréation de la VM dans la zone $zone et le scale set $vmssName"
   -size $size `
   -osDiskName $osDiskName `
   -dataDisksName $dataDisksName `
-  -zone $zone `
-  -vmssName $vmssName
-  -tags $tags
+  -zone $zone

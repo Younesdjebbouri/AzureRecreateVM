@@ -1,9 +1,8 @@
 param(
-  [Parameter(Mandatory = $true)][string]$sid, #ex: 50000000-0000-0000-0000-000000000000
-  [Parameter(Mandatory = $true)][string]$rg, #ex: RG-TEST-VD-1-PRD
-  [Parameter(Mandatory = $true)][string]$nicResourceGroupName ,
-  [Parameter(Mandatory = $true)][string]$vmName, #ex: vm-test-vd-1-prd
-  [Parameter(Mandatory = $true)][string]$vmssName, # Scale Set name, ex: vmss-vd-1-net-prd
+  [Parameter(Mandatory = $true)][string]$sid, #ex: 00000000-0000-0000-0000-000000000000
+  [Parameter(Mandatory = $true)][string]$rg, #ex: RG-WVD-CPG-SP-01
+  [Parameter(Mandatory = $true)][string]$vmName, #ex: VM-WVD-SP-01
+  [Parameter(Mandatory = $true)][string]$vmssName, # Scale Set name, ex: VMSS-WVD-SP-01
   [string]$location = "francecentral",
   [string]$zone = 1 # Destination zone
 )
@@ -20,32 +19,31 @@ Get-AzVmss -ResourceGroupName $rg -Name $vmssName -ErrorAction Stop
 Write-Host "Arrêt de la VM $vmName"
 Stop-AzVM -ResourceGroupName $rg -Name $vmName
 
-Write-Host "Recréation de disques dans la zone $zone"
-$res = .\RecreateVMDisks.ps1 -subscriptionID $sid -resourceGroupName $rg -vmName $vmName -zone $zone
-Write-Host "Fin du script de recréation des disques"
-
 $nic1 = $vm.NetworkProfile.NetworkInterfaces[0]
 $nicName = $nic1.Id.Split('/')[-1]
 $size = $vm.HardwareProfile.VmSize
 
-$osDiskName = $res.OsDiskName
-$dataDisksName = $res.DataDisksName
+
+$osDiskName = $vm.StorageProfile.OsDisk.Name
+$dataDisks = @()
+foreach ($diskName in $vm.StorageProfile.DataDisks.Name)
+{
+  $dataDisks += $diskName
+}
 
 Write-Host "La script va désormais supprimer la VM, tout en gardant les disques et la carte réseau"
 Remove-AzVM -ResourceGroupName $rg -Name $vmName  # Asks for confirmation
 Write-Host "VM $vmName supprimée"
 
 Write-Host "Recréation de la VM dans la zone $zone et le scale set $vmssName"
-.\RecreateVMFromDisksAndNicInAZonedScaleSet.ps1 `
+..\RecreateVMFromDisksAndNicInAZonedScaleSet.ps1 `
   -subscriptionID $sid `
   -resourceGroupName $rg `
-  -nicResourceGroupName $nicResourceGroupName `
   -vmName $vmName `
   -nicName $nicName `
   -location $location `
   -size $size `
   -osDiskName $osDiskName `
-  -dataDisksName $dataDisksName `
+  -dataDisksName $dataDisks `
   -zone $zone `
   -vmssName $vmssName
-  -tags $tags
